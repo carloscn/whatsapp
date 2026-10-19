@@ -59,7 +59,7 @@ jobs:
           set -euo pipefail
           npm ci
           npm version "${TAG#v}" --no-git-tag-version --allow-same-version
-          npm run dist:deb -- --publish never
+          npm run dist:deb
           deb="whatsapp_${TAG#v}_amd64.deb"
           test -f "dist/$deb"
           sha256sum "dist/$deb"
