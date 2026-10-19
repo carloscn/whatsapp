@@ -16,7 +16,7 @@
     "start": "scripts/launch.sh",
     "install-launcher": "node scripts/install-launcher.js",
     "dist": "electron-builder --linux AppImage deb",
-    "dist:deb": "electron-builder --linux deb",
+    "dist:deb": "electron-builder --linux deb --publish never",
     "render-icon": "python3 scripts/render-icon.py"
   },
   "build": {
