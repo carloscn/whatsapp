@@ -1,5 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#1B3A4B"/>
-  <path fill="#fff" d="M102 118h308a62 62 0 0 1 62 62v168a62 62 0 0 1-62 62H246l-92 78 22-78H102a62 62 0 0 1-62-62V180a62 62 0 0 1 62-62z"/>
-  <circle cx="368" cy="154" r="38" fill="#E8A15A"/>
+  <defs>
+    <linearGradient id="surface" x1="96" y1="56" x2="424" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DE79E"/>
+      <stop offset=".55" stop-color="#32CE78"/>
+      <stop offset="1" stop-color="#079B5D"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#surface)" d="M78 92c64-48 137-43 195-28 64 16 116-8 158 32 50 49 31 115 27 165-5 72 9 126-39 166-45 38-107 20-162 20-63 0-123 20-166-24-39-40-22-99-24-153-2-69-43-130 11-178z"/>
+  <rect x="139" y="178" width="258" height="55" rx="28" fill="#F1D8F4"/>
+  <rect x="139" y="265" width="224" height="55" rx="28" fill="#F1D8F4"/>
+  <rect x="139" y="352" width="158" height="55" rx="28" fill="#F1D8F4"/>
 </svg>

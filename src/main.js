@@ -6,6 +6,7 @@ const {
   Menu,
   Tray,
   nativeImage,
+  screen,
   session,
   shell,
 } = require('electron');
@@ -20,15 +21,16 @@ const USER_AGENT =
   `(KHTML, like Gecko) Chrome/${CHROME_VERSION} Safari/537.36`;
 const NOTIFY_CLICK = '__WA_DESKTOP_NOTIFY_CLICK__';
 const PROFILE_DIR = path.join(app.getPath('appData'), 'whatsapp');
+const WINDOW_TITLE = `WhatsApp Desktop v${app.getVersion()}`;
 
-const DENIED_PERMISSIONS = new Set([
-  'geolocation',
-  'midi',
-  'midiSysex',
-  'hid',
-  'serial',
-  'usb',
-  'bluetooth',
+const ALLOWED_PERMISSIONS = new Set([
+  'clipboard-sanitized-write',
+  'display-capture',
+  'fullscreen',
+  'media',
+  'notifications',
+  'persistent-storage',
+  'speaker-selection',
 ]);
 
 app.setName('whatsapp');
@@ -73,8 +75,11 @@ function loadConfig() {
 
 function saveConfig() {
   try {
-    fs.mkdirSync(PROFILE_DIR, { recursive: true });
-    fs.writeFileSync(configPath(), JSON.stringify(config));
+    fs.mkdirSync(PROFILE_DIR, { recursive: true, mode: 0o700 });
+    const destination = configPath();
+    const temporary = `${destination}.tmp`;
+    fs.writeFileSync(temporary, `${JSON.stringify(config)}\n`, { mode: 0o600 });
+    fs.renameSync(temporary, destination);
   } catch (error) {
     console.error('failed to save window state:', error.message);
   }
@@ -93,7 +98,8 @@ function acceptLanguage() {
 
 function isWebAppUrl(url) {
   try {
-    return new URL(url).hostname === 'web.whatsapp.com' && new URL(url).protocol === 'https:';
+    const parsed = new URL(url);
+    return parsed.hostname === 'web.whatsapp.com' && parsed.protocol === 'https:';
   } catch {
     return false;
   }
@@ -109,7 +115,9 @@ function openExternal(url) {
   try {
     const protocol = new URL(url).protocol;
     if (protocol === 'https:' || protocol === 'http:' || protocol === 'mailto:') {
-      shell.openExternal(url);
+      void shell.openExternal(url).catch((error) => {
+        console.error('failed to open external link:', error.message);
+      });
     }
   } catch {
     // Ignore malformed popup targets.
@@ -128,11 +136,14 @@ async function prepareSession() {
   const browserSession = session.defaultSession;
   browserSession.setUserAgent(USER_AGENT, acceptLanguage());
 
-  browserSession.setPermissionRequestHandler((_contents, permission, callback) => {
-    callback(!DENIED_PERMISSIONS.has(permission));
+  browserSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+    const requestingUrl = details.requestingUrl || contents.getURL();
+    callback(ALLOWED_PERMISSIONS.has(permission) && isWebAppUrl(requestingUrl));
   });
-  browserSession.setPermissionCheckHandler((_contents, permission) => {
-    return !DENIED_PERMISSIONS.has(permission);
+  browserSession.setPermissionCheckHandler((contents, permission, requestingOrigin, details) => {
+    const requestingUrl =
+      details.requestingUrl || details.securityOrigin || requestingOrigin || contents?.getURL();
+    return ALLOWED_PERMISSIONS.has(permission) && isWebAppUrl(requestingUrl);
   });
 
   browserSession.webRequest.onBeforeSendHeaders((details, callback) => {
@@ -164,7 +175,7 @@ function uniqueDownloadPath(filename) {
     const candidate = path.join(dir, `${base} (${index})${ext}`);
     if (!fs.existsSync(candidate)) return candidate;
   }
-  return target;
+  return path.join(dir, `${base} (${Date.now()})${ext}`);
 }
 
 function createWindow() {
@@ -177,7 +188,7 @@ function createWindow() {
     show: false,
     autoHideMenuBar: true,
     backgroundColor: '#111b21',
-    title: 'WhatsApp',
+    title: WINDOW_TITLE,
     icon: windowIcon.isEmpty() ? undefined : windowIcon,
     webPreferences: {
       contextIsolation: true,
@@ -201,15 +212,11 @@ function createWindow() {
   win.on('close', (event) => {
     if (!isQuitting && tray) {
       event.preventDefault();
-      win.hide();
-      refreshTrayMenu();
+      hideMainWindow();
     }
   });
   win.on('show', refreshTrayMenu);
-  win.on('hide', () => {
-    refreshTrayMenu();
-    scheduleSaveBounds();
-  });
+  win.on('hide', refreshTrayMenu);
   win.on('focus', () => win.flashFrame(false));
   win.on('resize', scheduleSaveBounds);
   win.on('move', scheduleSaveBounds);
@@ -225,7 +232,11 @@ function createWindow() {
     openExternal(url);
     return { action: 'deny' };
   });
-  contents.on('page-title-updated', (_event, title) => updateUnread(title));
+  contents.on('page-title-updated', (event, title) => {
+    event.preventDefault();
+    win.setTitle(WINDOW_TITLE);
+    updateUnread(title);
+  });
   contents.on('zoom-changed', () => {
     config.zoomLevel = contents.getZoomLevel();
     saveConfig();
@@ -250,7 +261,7 @@ function createWindow() {
       quitApp();
     } else if (key === 'w') {
       event.preventDefault();
-      if (tray) win.hide();
+      if (tray) hideMainWindow();
       else win.close();
     } else if (key === 'i' && input.shift) {
       event.preventDefault();
@@ -279,24 +290,39 @@ function createWindow() {
 
 function restoreBounds() {
   const saved = config.bounds;
-  if (!saved || typeof saved.width !== 'number' || typeof saved.height !== 'number') {
+  if (
+    !saved ||
+    !Number.isFinite(saved.x) ||
+    !Number.isFinite(saved.y) ||
+    !Number.isFinite(saved.width) ||
+    !Number.isFinite(saved.height)
+  ) {
     return { width: 1200, height: 800 };
   }
+
+  const workArea = screen.getDisplayMatching(saved).workArea;
+  const width = Math.min(Math.max(880, saved.width), workArea.width);
+  const height = Math.min(Math.max(640, saved.height), workArea.height);
   return {
-    x: saved.x,
-    y: saved.y,
-    width: Math.max(880, saved.width),
-    height: Math.max(640, saved.height),
+    x: Math.min(Math.max(saved.x, workArea.x), workArea.x + workArea.width - width),
+    y: Math.min(Math.max(saved.y, workArea.y), workArea.y + workArea.height - height),
+    width,
+    height,
   };
 }
 
 let saveTimer = null;
+function saveWindowBounds() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  config.bounds = mainWindow.getBounds();
+  saveConfig();
+}
+
 function scheduleSaveBounds() {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.isVisible()) return;
-    config.bounds = mainWindow.getBounds();
-    saveConfig();
+    saveWindowBounds();
   }, 300);
 }
 
@@ -344,11 +370,16 @@ function showMainWindow() {
   refreshTrayMenu();
 }
 
+function hideMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  saveWindowBounds();
+  mainWindow.hide();
+}
+
 function toggleWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  if (mainWindow.isVisible() && mainWindow.isFocused()) mainWindow.hide();
+  if (mainWindow.isVisible()) hideMainWindow();
   else showMainWindow();
-  refreshTrayMenu();
 }
 
 function buildTrayMenu() {
@@ -356,7 +387,7 @@ function buildTrayMenu() {
   return Menu.buildFromTemplate([
     {
       label: visible ? '隐藏窗口' : '显示窗口',
-      click: toggleWindow,
+      click: visible ? hideMainWindow : showMainWindow,
     },
     {
       label: '重新加载',

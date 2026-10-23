@@ -1,6 +1,6 @@
 {
   "name": "whatsapp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Personal WhatsApp Web desktop window with a remembered login, tray, and notifications.",
   "author": "Carlos Wei <carlos.wei.hk@gmail.com>",
@@ -17,7 +17,8 @@
     "install-launcher": "node scripts/install-launcher.js",
     "dist": "electron-builder --linux AppImage deb",
     "dist:deb": "electron-builder --linux deb --publish never",
-    "render-icon": "python3 scripts/render-icon.py"
+    "render-icon": "python3 scripts/render-icon.py",
+    "check": "node --check src/main.js && node --check src/notification-hook.js && python3 -c \"compile(open('scripts/render-icon.py', encoding='utf-8').read(), 'scripts/render-icon.py', 'exec')\""
   },
   "build": {
     "appId": "dev.carloscn.whatsapp",
@@ -26,6 +27,7 @@
     "files": [
       "src/**/*",
       "assets/**/*",
+      "!assets/icon-source.png",
       "package.json"
     ],
     "linux": {

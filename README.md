@@ -19,6 +19,8 @@ Sign in by scanning the QR code with your phone, the same way as in a browser. T
 ## Desktop behavior
 
 - Closing the window hides it in the tray. Quit from the tray menu, or press `Ctrl+Q`.
+- Use “显示窗口/隐藏窗口” in the tray menu to toggle the window. Clicking the tray icon also toggles it when the desktop supports tray clicks.
+- The native title bar shows the installed application version.
 - `Ctrl+W` hides the window in the tray.
 - `Ctrl+=` zooms in, `Ctrl+-` zooms out, and `Ctrl+0` returns to 100%.
 - New messages use system notifications. Clicking a notification brings the window back. When the title shows an unread count, the tray tooltip reads “WhatsApp · N unread”.
@@ -45,4 +47,4 @@ Publish a GitHub Release tagged like `v1.2.3`. Actions builds `whatsapp_<version
 
 This repository is public. The SSH private key, host, and known_hosts file live only in the GitHub `apt` environment, and that environment accepts only `v*` tags. The deploy key on the server can run the publish command and cannot open a shell.
 
-`0.1.0` is already in apt. The next Release needs a higher version. The same version cannot be replaced with a different deb.
+Each Release needs a higher semantic version. The same version cannot be replaced with a different deb.
