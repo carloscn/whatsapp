@@ -24,7 +24,7 @@ Sign in by scanning the QR code with your phone, the same way as in a browser. T
 - `Ctrl+W` hides the window in the tray.
 - `Ctrl+=` zooms in, `Ctrl+-` zooms out, and `Ctrl+0` returns to 100%.
 - New messages use system notifications. Clicking a notification brings the window back. When the title shows an unread count, the tray tooltip reads “WhatsApp · N unread”.
-- Downloads go straight to the Downloads folder.
+- Downloads go straight to `~/Downloads/whatsapp`.
 - Voice and video calls use the microphone and camera. If the system asks for access, allow it.
 - Window size and zoom are saved in `~/.config/whatsapp/window.json`.
 

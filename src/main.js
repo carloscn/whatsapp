@@ -167,17 +167,18 @@ async function prepareSession() {
 }
 
 function uniqueDownloadPath(filename) {
-  const dir = app.getPath('downloads');
-  const safe = path.basename(String(filename || 'download')).replace(/[^\w.\- ()\u0080-\uFFFF]+/g, '_') || 'download';
+  const dir = path.join(app.getPath('downloads'), 'whatsapp');
+  fs.mkdirSync(dir, { recursive: true });
+  const safe = path.basename(String(filename || 'download')).replace(/[^\w.\-\u0080-\uFFFF]+/g, '_') || 'download';
   const target = path.join(dir, safe);
   if (!fs.existsSync(target)) return target;
   const ext = path.extname(safe);
   const base = path.basename(safe, ext);
   for (let index = 1; index < 1000; index += 1) {
-    const candidate = path.join(dir, `${base} (${index})${ext}`);
+    const candidate = path.join(dir, `${base}_${index}${ext}`);
     if (!fs.existsSync(candidate)) return candidate;
   }
-  return path.join(dir, `${base} (${Date.now()})${ext}`);
+  return path.join(dir, `${base}_${Date.now()}${ext}`);
 }
 
 function createWindow() {
