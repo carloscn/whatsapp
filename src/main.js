@@ -4,6 +4,8 @@ const {
   app,
   BrowserWindow,
   Menu,
+  ClipboardItem,
+  clipboard,
   Tray,
   nativeImage,
   screen,
@@ -263,6 +265,8 @@ function createWindow() {
       event.preventDefault();
       if (tray) hideMainWindow();
       else win.close();
+    } else if (key === 'c' && !input.shift) {
+      copyViewedImage(contents);
     } else if (key === 'i' && input.shift) {
       event.preventDefault();
       contents.toggleDevTools();
@@ -286,6 +290,47 @@ function createWindow() {
   });
 
   return win;
+}
+
+// WhatsApp Web's media viewer has no Ctrl+C handling, so copy the image shown
+// there ourselves. Normal text copy is left alone when something is selected.
+const VIEWER_IMAGE_SCRIPT = `(async () => {
+  const sel = window.getSelection();
+  if (sel && String(sel).length) return null;
+  const a = document.activeElement;
+  if (a && (a.isContentEditable || /^(INPUT|TEXTAREA)$/.test(a.tagName))) return null;
+  let best = null, bestArea = 0;
+  for (const img of document.querySelectorAll('img')) {
+    const r = img.getBoundingClientRect();
+    const area = r.width * r.height;
+    if (r.width < 200 || r.height < 120 || area <= bestArea) continue;
+    if (r.bottom <= 0 || r.right <= 0 || r.top >= innerHeight || r.left >= innerWidth) continue;
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (!top || !(top === img || img.parentElement.contains(top))) continue;
+    best = img; bestArea = area;
+  }
+  if (!best || !best.naturalWidth) return null;
+  const c = document.createElement('canvas');
+  c.width = best.naturalWidth; c.height = best.naturalHeight;
+  c.getContext('2d').drawImage(best, 0, 0);
+  try { return c.toDataURL('image/png'); } catch (e) {}
+  const blob = await (await fetch(best.src)).blob();
+  const bmp = await createImageBitmap(blob);
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext('2d').drawImage(bmp, 0, 0);
+  return c.toDataURL('image/png');
+})()`;
+
+function copyViewedImage(contents) {
+  contents
+    .executeJavaScript(VIEWER_IMAGE_SCRIPT)
+    .then((dataUrl) => {
+      if (!dataUrl) return;
+      const png = nativeImage.createFromDataURL(dataUrl).toPNG();
+      if (!png.length) return;
+      return clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+    })
+    .catch((e) => process.stderr.write(`copy image failed: ${e}\n`));
 }
 
 function restoreBounds() {
